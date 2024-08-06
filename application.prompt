@@ -1,0 +1,19 @@
+Help me write an application for the job indicated by JOBDESC
+
+Use the data from my cv as indicated by CVDATA
+
+match the style of the application letter to the tone of the job description, especially if the writing in in german du-style or sie-style.
+don't refer to the company names directly, instead use a general description of the role.
+
+>>>>JOBDESC
+
+${JOBDESC}
+
+<<<<JOBDESC
+
+>>>>CVDATA
+
+${CVDATA}
+
+<<<<CVDATA
+
