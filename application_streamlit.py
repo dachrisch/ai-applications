@@ -1,3 +1,5 @@
+import json
+
 import streamlit as st
 
 from ai.validate import is_valid_openai_key
@@ -16,22 +18,31 @@ with st.sidebar:
         st.session_state.api_key = ''
 
     st.title('CV data')
-    cv_file = st.file_uploader('Text file with cv data', type="txt",accept_multiple_files=False)
+    cv_file = st.file_uploader('Text file with cv data', type="txt", accept_multiple_files=False)
     if cv_file:
         st.session_state.cv_data = cv_file.getvalue().decode('utf8')
     else:
         st.error('Please upload cv data')
 
+    st.title('Google Credentials')
+    google_credentials_file = st.file_uploader('Google Credentials JSON', type="json", accept_multiple_files=False)
+    if google_credentials_file:
+        st.session_state.google_credentials_json = json.loads(google_credentials_file.getvalue())
+    else:
+        st.error('Please upload google credentials file')
+
 st.title("Application Helper")
 
-offer_page = st.Page('pages/offer.py', title='Analyze Job Offer')
-application_page = st.Page('pages/application.py', title='Create Application')
+offer_page = st.Page('steps/offer.py', title='Analyze Job Offer')
+application_page = st.Page('steps/application.py', title='Create Application')
+cover_letter_page = st.Page('steps/cover.py', title='Create Cover Letter')
 
-pages = [offer_page, application_page]
+pages = [offer_page, application_page, cover_letter_page]
 if 'step' not in st.session_state:
     st.session_state.step = 0
 
-progress = st.progress(int((st.session_state.step ) / (len(pages) - 1) * 100))
+progress = st.progress(int(st.session_state.step / (len(pages) - 1) * 100),
+                       text=f'[{st.session_state.step + 1}/{len(pages)}] {pages[st.session_state.step].title}')
 columns = st.columns((1, 5, 1))
 with columns[0]:
     if st.session_state.step > 0:
@@ -46,6 +57,3 @@ with columns[2]:
 
 pg = st.navigation([pages[st.session_state.step]], position='hidden')
 pg.run()
-
-
-progress.progress(int((st.session_state.step) / (len(pages) - 1) * 100), text=pages[st.session_state.step].title)
