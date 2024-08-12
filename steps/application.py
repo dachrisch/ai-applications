@@ -14,8 +14,9 @@ if all(k in st.session_state for k in ('cv_data', 'job_description_json')):
     with st.expander('Application prompt'):
         st.write(application_prompt)
 
-    st.session_state.prompt_refinements = st.text_input(label='Prompt refinements',
-                                                        placeholder='Anything you want to add to the prompt')
+    st.session_state.prompt_refinements = st.text_area(label='Prompt refinements',
+                                                        placeholder='Anything you want to add to the prompt',
+                                                        value=st.session_state.get('prompt_refinements'))
     if st.button('Create'):
         with st.spinner('Creating Application'):
             c = Conversation(openai_api_key=st.session_state.api_key, response_format="text")

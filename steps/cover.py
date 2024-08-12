@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from typing import Any
 
 import streamlit as st
 from google.auth.transport.requests import Request
@@ -7,41 +9,125 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
-DOCUMENT_ID = "195j9eDD3ccgjQRttHhJPymLJUCOUjs-jmwTrekvdjFE"
+SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/drive']
+DOCUMENT_ID = "1CVawnjkR2eMJ6pqHlu8su3zvmrIdesfR78DNAUhKubE"
 
 
-def login_to_google():
-    """Shows basic usage of the Docs API.
-    Prints the title of a sample document.
-    """
-    creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+class GoogleCredentialsHandler(object):
+    def __init__(self, credentials: Credentials | None, token_file: str):
+        self.token_file = token_file
+        self.credentials = credentials
+
+    @classmethod
+    def from_token(cls, filename='token.json'):
+        if os.path.exists(filename):
+            return cls(Credentials.from_authorized_user_file(filename, SCOPES), token_file=filename)
         else:
-            flow = InstalledAppFlow.from_client_config(
-                st.session_state.google_credentials_json, SCOPES
-            )
-            creds = flow.run_local_server()
-        # Save the credentials for the next run
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
+            return cls(None, token_file=filename)
+
+    def is_logged_in(self):
+        return self.credentials is not None and self.credentials.valid
+
+    def need_refresh(self):
+        return self.credentials and self.credentials.expired and self.credentials.refresh_token
+
+    def refresh(self):
+        self.credentials.refresh(Request())
+
+    def run_flow(self, google_credentials_json: dict[Any, Any]):
+        flow = InstalledAppFlow.from_client_config(
+            google_credentials_json, SCOPES
+        )
+        self.credentials = flow.run_local_server()
+
+    def save_token(self):
+        with open(self.token_file, "w") as token:
+            token.write(self.credentials.to_json())
+
+    def logout(self):
+        os.unlink(self.token_file)
+        del self.credentials
+
+
+creds = GoogleCredentialsHandler.from_token()
+
+
+def login_to_google(credentials_handler: GoogleCredentialsHandler):
+    if not credentials_handler.is_logged_in():
+        if credentials_handler.need_refresh():
+            credentials_handler.refresh()
+        else:
+            credentials_handler.run_flow(st.session_state.google_credentials_json)
+
+        credentials_handler.save_token()
+
+st.subheader('Create Cover Letter')
+if creds.is_logged_in():
+    if st.button('Logout', type='secondary'):
+        creds.logout()
+        st.rerun()
 
     try:
-        service = build("docs", "v1", credentials=creds)
+        docs_service = build("docs", "v1", credentials=creds.credentials)
+        drive_service = build("drive", "v3", credentials=creds.credentials)
 
-        # Retrieve the documents contents from the Docs service.
-        document = service.documents().get(documentId=DOCUMENT_ID).execute()
+        document = docs_service.documents().get(documentId=DOCUMENT_ID).execute()
 
-        print(f"The title of the document is: {document.get('title')}")
+        st.write(
+            f"Template in use is: [{document.get('title')}](https://docs.google.com/document/d/{document.get('documentId')})")
+        if st.button('Create Cover letter'):
+            with st.spinner('Creating Cover Letter'):
+                cover_letter = drive_service.files().copy(fileId=document.get('documentId'), body={
+                    'name': f'Anschreiben - {st.session_state.job_description_json['job']['company_name']}'}).execute()
+
+                requests = [
+                    {
+                        'replaceAllText': {
+                            'containsText': {
+                                'text': '{{date}}',
+                                'matchCase': 'true'
+                            },
+                            'replaceText': str(datetime.now().strftime("%d.%m.%Y")),
+                        }
+                    },
+                    {
+                        'replaceAllText': {
+                            'containsText': {
+                                'text': '{{company_name}}',
+                                'matchCase': 'true'
+                            },
+                            'replaceText': st.session_state.job_description_json['job']['company_name'],
+                        }
+                    },
+                    {
+                        'replaceAllText': {
+                            'containsText': {
+                                'text': '{{role_title}}',
+                                'matchCase': 'true'
+                            },
+                            'replaceText': st.session_state.job_description_json['job']['title'],
+                        }
+                    },
+                    {
+                        'replaceAllText': {
+                            'containsText': {
+                                'text': '{{cover_body}}',
+                                'matchCase': 'true'
+                            },
+                            'replaceText': st.session_state.application,
+                        }
+                    }
+
+                ]
+
+                result = docs_service.documents().batchUpdate(
+                    documentId=cover_letter.get('id'), body={'requests': requests}).execute()
+
+            st.success(
+                f"Created [{cover_letter.get('name')}](https://docs.google.com/document/d/{cover_letter.get('id')})")
     except HttpError as err:
         st.error(err)
-
-login_to_google()
+else:
+    if st.button('Login'):
+        login_to_google(creds)
+        st.rerun()

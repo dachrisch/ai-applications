@@ -4,20 +4,27 @@ from ai.conversation import Conversation
 from ai.validate import is_valid_openai_key
 from web.fetch import fetch_url_content
 
-st.subheader('Job Offer')
-st.session_state.site = st.text_input("Enter site with job offer", placeholder='Enter url with job description',
-                                      value=st.session_state.get('site'))
+url_tab, content_tab = st.tabs(['From URL', 'From Content'])
+with url_tab:
+    st.subheader('Job Offer')
+    st.session_state.site = st.text_input("Enter site with job offer", placeholder='Enter url with job description',
+                                          value=st.session_state.get('site'))
+    st.session_state.site_content=fetch_url_content(st.session_state.site)
+with content_tab:
+    st.subheader('Job Offer')
+    st.session_state.site_content = st.text_area("Paste site content with job offer",
+                                                 placeholder='Copy & Paste the site content here',
+                                                 value=st.session_state.get('site_content'))
 
 if not is_valid_openai_key(st.session_state.api_key):
     st.error('You need an OpenAI key to proceed')
 elif st.button("Analyze"):
-    if st.session_state.site:
+    if st.session_state.site_content:
         with st.spinner('Analyzing'):
-            page_content = fetch_url_content(st.session_state.site)
 
             c = Conversation(openai_api_key=st.session_state.api_key)
             system_prompt = ('Analyze the content of this webpage and find the job description. '
-                             'if no job description is found, return empty json'
+                             'if no job description is found, return empty json as {}'
                              'if a job description is found, respond with'
                              '{'
                              '"job":{'
@@ -30,7 +37,7 @@ elif st.button("Analyze"):
                              '"additional": <all additional infos not covered before>'
                              '}'
                              '}')
-            user_prompt = f'The web page content is: {page_content}'
+            user_prompt = f'The web page content is: {st.session_state.site_content}'
             with st.expander('Prompt'):
                 st.write(system_prompt)
                 st.write(user_prompt)
