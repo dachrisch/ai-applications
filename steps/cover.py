@@ -1,53 +1,12 @@
-import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import streamlit as st
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
-SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/drive']
-DOCUMENT_ID = "1CVawnjkR2eMJ6pqHlu8su3zvmrIdesfR78DNAUhKubE"
+from api.credentials_helper import GoogleCredentialsHandler
 
-
-class GoogleCredentialsHandler(object):
-    def __init__(self, credentials: Credentials | None, token_file: str):
-        self.token_file = token_file
-        self.credentials = credentials
-
-    @classmethod
-    def from_token(cls, filename='token.json'):
-        if os.path.exists(filename):
-            return cls(Credentials.from_authorized_user_file(filename, SCOPES), token_file=filename)
-        else:
-            return cls(None, token_file=filename)
-
-    def is_logged_in(self):
-        return self.credentials is not None and self.credentials.valid
-
-    def need_refresh(self):
-        return self.credentials and self.credentials.expired and self.credentials.refresh_token
-
-    def refresh(self):
-        self.credentials.refresh(Request())
-
-    def run_flow(self, google_credentials_json: dict[Any, Any]):
-        flow = InstalledAppFlow.from_client_config(
-            google_credentials_json, SCOPES
-        )
-        self.credentials = flow.run_local_server()
-
-    def save_token(self):
-        with open(self.token_file, "w") as token:
-            token.write(self.credentials.to_json())
-
-    def logout(self):
-        os.unlink(self.token_file)
-        del self.credentials
-
+TEMPLATE_ID = "1CVawnjkR2eMJ6pqHlu8su3zvmrIdesfR78DNAUhKubE"
 
 creds = GoogleCredentialsHandler.from_token()
 
@@ -61,73 +20,92 @@ def login_to_google(credentials_handler: GoogleCredentialsHandler):
 
         credentials_handler.save_token()
 
+
+def copy_replace_doc(template_id: str, job_description_json: Dict[str, Any], application_text: str):
+    docs_service = build("docs", "v1", credentials=creds.credentials)
+    drive_service = build("drive", "v3", credentials=creds.credentials)
+    cover_letter_file = drive_service.files().copy(fileId=template_id, body={
+        'name': f'Anschreiben - {job_description_json['job']['company_name']}'}).execute()
+
+    requests = [
+        {
+            'replaceAllText': {
+                'containsText': {
+                    'text': '{{date}}',
+                    'matchCase': 'true'
+                },
+                'replaceText': str(datetime.now().strftime("%d.%m.%Y")),
+            }
+        },
+        {
+            'replaceAllText': {
+                'containsText': {
+                    'text': '{{company_name}}',
+                    'matchCase': 'true'
+                },
+                'replaceText': job_description_json['job']['company_name'],
+            }
+        },
+        {
+            'replaceAllText': {
+                'containsText': {
+                    'text': '{{role_title}}',
+                    'matchCase': 'true'
+                },
+                'replaceText': job_description_json['job']['title'],
+            }
+        },
+        {
+            'replaceAllText': {
+                'containsText': {
+                    'text': '{{cover_body}}',
+                    'matchCase': 'true'
+                },
+                'replaceText': application_text,
+            }
+        }
+
+    ]
+
+    response = docs_service.documents().batchUpdate(
+        documentId=cover_letter_file.get('id'), body={'requests': requests}).execute()
+    return cover_letter_file
+
+
 st.subheader('Create Cover Letter')
-if creds.is_logged_in():
-    if st.button('Logout', type='secondary'):
-        creds.logout()
-        st.rerun()
 
-    try:
-        docs_service = build("docs", "v1", credentials=creds.credentials)
-        drive_service = build("drive", "v3", credentials=creds.credentials)
 
-        document = docs_service.documents().get(documentId=DOCUMENT_ID).execute()
+def get_template_file():
+    docs_service = build("docs", "v1", credentials=creds.credentials)
+    return docs_service.documents().get(documentId=TEMPLATE_ID).execute()
 
-        st.write(
-            f"Template in use is: [{document.get('title')}](https://docs.google.com/document/d/{document.get('documentId')})")
+
+if 'job_description_json' not in st.session_state or 'application' not in st.session_state:
+    st.error('Job application not analyzed')
+else:
+    with st.container(border=True):
+        if creds.is_logged_in():
+            st.markdown('##### :heavy_check_mark: Google Drive Connection')
+            if st.button('Logout', type='secondary'):
+                creds.logout()
+                st.rerun()
+            document = get_template_file()
+            st.write(
+                f"Template in use is: [{document.get('title')}](https://docs.google.com/document/d/{document.get('documentId')})")
+        else:
+            st.markdown('##### :x: Google Drive Connection')
+            if st.button('Login'):
+                login_to_google(creds)
+                st.rerun()
+
+    if creds.is_logged_in():
+        with st.expander('Cover body'):
+            st.write(st.session_state.application)
         if st.button('Create Cover letter'):
             with st.spinner('Creating Cover Letter'):
-                cover_letter = drive_service.files().copy(fileId=document.get('documentId'), body={
-                    'name': f'Anschreiben - {st.session_state.job_description_json['job']['company_name']}'}).execute()
+                cover_letter = copy_replace_doc(TEMPLATE_ID,
+                                                st.session_state.job_description_json,
+                                                st.session_state.application)
 
-                requests = [
-                    {
-                        'replaceAllText': {
-                            'containsText': {
-                                'text': '{{date}}',
-                                'matchCase': 'true'
-                            },
-                            'replaceText': str(datetime.now().strftime("%d.%m.%Y")),
-                        }
-                    },
-                    {
-                        'replaceAllText': {
-                            'containsText': {
-                                'text': '{{company_name}}',
-                                'matchCase': 'true'
-                            },
-                            'replaceText': st.session_state.job_description_json['job']['company_name'],
-                        }
-                    },
-                    {
-                        'replaceAllText': {
-                            'containsText': {
-                                'text': '{{role_title}}',
-                                'matchCase': 'true'
-                            },
-                            'replaceText': st.session_state.job_description_json['job']['title'],
-                        }
-                    },
-                    {
-                        'replaceAllText': {
-                            'containsText': {
-                                'text': '{{cover_body}}',
-                                'matchCase': 'true'
-                            },
-                            'replaceText': st.session_state.application,
-                        }
-                    }
-
-                ]
-
-                result = docs_service.documents().batchUpdate(
-                    documentId=cover_letter.get('id'), body={'requests': requests}).execute()
-
-            st.success(
-                f"Created [{cover_letter.get('name')}](https://docs.google.com/document/d/{cover_letter.get('id')})")
-    except HttpError as err:
-        st.error(err)
-else:
-    if st.button('Login'):
-        login_to_google(creds)
-        st.rerun()
+                st.success(
+                    f"Created [{cover_letter.get('name')}](https://docs.google.com/document/d/{cover_letter.get('id')})")

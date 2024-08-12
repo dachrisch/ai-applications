@@ -4,14 +4,13 @@ from ai.conversation import Conversation
 from ai.validate import is_valid_openai_key
 from web.fetch import fetch_url_content
 
+st.subheader('Job Offer')
 url_tab, content_tab = st.tabs(['From URL', 'From Content'])
 with url_tab:
-    st.subheader('Job Offer')
     st.session_state.site = st.text_input("Enter site with job offer", placeholder='Enter url with job description',
                                           value=st.session_state.get('site'))
-    st.session_state.site_content=fetch_url_content(st.session_state.site)
+    st.session_state.site_content = fetch_url_content(st.session_state.site)
 with content_tab:
-    st.subheader('Job Offer')
     st.session_state.site_content = st.text_area("Paste site content with job offer",
                                                  placeholder='Copy & Paste the site content here',
                                                  value=st.session_state.get('site_content'))

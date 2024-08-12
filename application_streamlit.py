@@ -5,6 +5,12 @@ import streamlit as st
 from ai.validate import is_valid_openai_key
 
 with st.sidebar:
+    st.title('Application')
+    if st.button('Start Over'):
+        for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
+            if state in st.session_state:
+                st.session_state.pop(state)
+
     st.title("Configuration")
     st.session_state.api_key = st.text_input("Enter OpenAI API key:", type="password",
                                              help='Get your key [here](https://platform.openai.com/organization/api-keys)')
@@ -17,14 +23,12 @@ with st.sidebar:
         st.error('Invalid API key. Enter correct API key.')
         st.session_state.api_key = ''
 
-    st.title('CV data')
     cv_file = st.file_uploader('Text file with cv data', type="txt", accept_multiple_files=False)
     if cv_file:
         st.session_state.cv_data = cv_file.getvalue().decode('utf8')
     else:
         st.error('Please upload cv data')
 
-    st.title('Google Credentials')
     google_credentials_file = st.file_uploader('Google Credentials JSON', type="json", accept_multiple_files=False)
     if google_credentials_file:
         st.session_state.google_credentials_json = json.loads(google_credentials_file.getvalue())
