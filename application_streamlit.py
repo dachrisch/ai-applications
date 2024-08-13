@@ -10,6 +10,7 @@ with st.sidebar:
         for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
             if state in st.session_state:
                 st.session_state.pop(state)
+        st.query_params.from_dict({'step':0})
 
     st.title("Configuration")
     st.session_state.api_key = st.text_input("Enter OpenAI API key:", type="password",
@@ -42,22 +43,26 @@ application_page = st.Page('steps/application.py', title='Create Application')
 cover_letter_page = st.Page('steps/cover.py', title='Create Cover Letter')
 
 pages = [offer_page, application_page, cover_letter_page]
-if 'step' not in st.session_state:
-    st.session_state.step = 0
 
-progress = st.progress(int(st.session_state.step / (len(pages) - 1) * 100),
-                       text=f'[{st.session_state.step + 1}/{len(pages)}] {pages[st.session_state.step].title}')
+if 'step' not in st.query_params:
+    st.query_params.from_dict({'step':0})
+
+step = int(st.query_params.step)
+
+progress = st.progress(int(step / (len(pages) - 1) * 100),
+                       text=f'[{step + 1}/{len(pages)}] {pages[step].title}')
 columns = st.columns((1, 5, 1))
 with columns[0]:
-    if st.session_state.step > 0:
+    if step > 0:
         if st.button('Back', type='primary'):
-            st.session_state.step = int((st.session_state.step - 1) % len(pages))
+            st.query_params.step = int((step - 1) % len(pages))
             st.rerun()
 with columns[2]:
-    if (st.session_state.step + 1) < len(pages):
+    if (step + 1) < len(pages):
         if st.button('Next', type='primary'):
-            st.session_state.step = int((st.session_state.step + 1) % len(pages))
+            st.query_params.step = int((step + 1) % len(pages))
             st.rerun()
 
-pg = st.navigation([pages[st.session_state.step]], position='hidden')
+pg = st.navigation([pages[step]], position='hidden')
 pg.run()
+st.query_params.from_dict({'step':step})
