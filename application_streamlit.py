@@ -1,7 +1,9 @@
 import json
+from datetime import datetime
 
 import streamlit as st
 
+from ai.conversation import Conversation
 from ai.validate import is_valid_openai_key
 
 with st.sidebar:
@@ -10,7 +12,8 @@ with st.sidebar:
         for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
             if state in st.session_state:
                 st.session_state.pop(state)
-        st.query_params.from_dict({'step':0})
+        st.query_params.from_dict({'step': 0})
+
 
     st.title("Configuration")
     st.session_state.api_key = st.text_input("Enter OpenAI API key:", type="password",
@@ -20,6 +23,11 @@ with st.sidebar:
         st.error('Please enter your OpenAI API Key.')
     elif is_valid_key:
         st.success('API Key valid.')
+        c = Conversation(st.session_state.api_key)
+        usage = c.usage(datetime.now())
+        with st.expander('Token Usage'):
+            st.write(f'Context  : {usage.context_tokens} ({usage.context_costs:.2f} €)')
+            st.write(f'Generated: {usage.generated_tokens} ({usage.generated_costs:.2f} €)')
     else:
         st.error('Invalid API key. Enter correct API key.')
         st.session_state.api_key = ''
@@ -45,7 +53,7 @@ cover_letter_page = st.Page('steps/cover.py', title='Create Cover Letter')
 pages = [offer_page, application_page, cover_letter_page]
 
 if 'step' not in st.query_params:
-    st.query_params.from_dict({'step':0})
+    st.query_params.from_dict({'step': 0})
 
 step = int(st.query_params.step)
 
@@ -65,4 +73,4 @@ with columns[2]:
 
 pg = st.navigation([pages[step]], position='hidden')
 pg.run()
-st.query_params.from_dict({'step':step})
+st.query_params.from_dict({'step': step})
