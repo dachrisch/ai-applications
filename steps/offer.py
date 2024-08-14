@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 
 from ai.conversation import Conversation
@@ -9,13 +10,19 @@ url_tab, content_tab = st.tabs(['From URL', 'From Content'])
 with url_tab:
     st.session_state.site = st.text_input("Enter site with job offer", placeholder='Enter url with job description',
                                           value=st.session_state.get('site'))
-    st.session_state.site_content = fetch_url_content(st.session_state.site)
+    if st.session_state.site:
+        with st.spinner('Fetching site content'):
+            try:
+                st.session_state.site_content = fetch_url_content(st.session_state.site)
+            except requests.exceptions.RequestException as e:
+                st.error(f'Error while fetching url {st.session_state.site}: {e}')
+
 with content_tab:
     st.session_state.site_content = st.text_area("Paste site content with job offer",
                                                  placeholder='Copy & Paste the site content here',
                                                  value=st.session_state.get('site_content'))
 
-if not is_valid_openai_key(st.session_state.api_key):
+if not is_valid_openai_key(st.session_state.get('api_key')):
     st.error('You need an OpenAI key to proceed')
 elif st.button("Analyze"):
     if st.session_state.site_content:
