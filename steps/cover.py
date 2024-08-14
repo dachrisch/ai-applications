@@ -72,13 +72,12 @@ def copy_replace_doc(template_id: str, job_description_json: Dict[str, Any], app
     return cover_letter_file
 
 
-st.subheader('Create Cover Letter')
-
-
 def get_template_file():
     docs_service = build("docs", "v1", credentials=creds.credentials)
     return docs_service.documents().get(documentId=TEMPLATE_ID).execute()
 
+
+st.subheader('Create Cover Letter')
 
 if 'job_description_json' not in st.session_state or 'application' not in st.session_state:
     st.error('Job application not analyzed')

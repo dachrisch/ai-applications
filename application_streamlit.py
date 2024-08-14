@@ -13,8 +13,7 @@ with st.sidebar:
     if st.button('Start Over'):
         for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
             if state in st.session_state:
-                pass
-                #st.session_state.pop(state)
+                st.session_state.pop(state)
         st.query_params.from_dict({'step': 0})
 
     st.title("Configuration")
