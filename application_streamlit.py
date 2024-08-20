@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 
 import streamlit as st
@@ -8,17 +9,13 @@ from ai.conversation import Conversation
 from ai.validate import is_valid_openai_key
 from steps.pages import pages
 
-with st.sidebar:
-    st.title('Application')
-    if st.button('Start Over'):
-        for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
-            if state in st.session_state:
-                st.session_state.pop(state)
-        st.query_params.from_dict({'step': 0})
 
-    st.title("Configuration")
+def open_api_key_handling():
+    if not st.session_state.get('api_key'):
+        st.session_state.api_key = os.getenv('OPENAI_API_KEY', None)
     api_key = st.text_input("Enter OpenAI API key:", type="password",
-                            help='Get your key [here](https://platform.openai.com/organization/api-keys)')
+                            help='Get your key [here](https://platform.openai.com/organization/api-keys)',
+                            value=st.session_state.get('api_key'))
     try:
         if not api_key:
             st.error('Please enter your OpenAI API Key.')
@@ -38,6 +35,18 @@ with st.sidebar:
 
     except APIStatusError as e:
         st.error(f'API Error: {e}\nsee [status.openai.com](https://status.openai.com/)')
+
+
+with st.sidebar:
+    st.title('Application')
+    if st.button('Start Over'):
+        for state in ['job_description_json', 'step', 'site', 'site_content', 'application']:
+            if state in st.session_state:
+                st.session_state.pop(state)
+        st.query_params.from_dict({'step': 0})
+
+    st.title("Configuration")
+    open_api_key_handling()
 
     cv_file = st.file_uploader('Text file with cv data', type="txt", accept_multiple_files=False)
     if cv_file:

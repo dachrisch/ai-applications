@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 import streamlit as st
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 
 from api.credentials_helper import GoogleCredentialsHandler
@@ -14,7 +15,10 @@ creds = GoogleCredentialsHandler.from_token()
 def login_to_google(credentials_handler: GoogleCredentialsHandler):
     if not credentials_handler.is_logged_in():
         if credentials_handler.need_refresh():
-            credentials_handler.refresh()
+            try:
+                credentials_handler.refresh()
+            except RefreshError:
+                credentials_handler.run_flow(st.session_state.google_credentials_json)
         else:
             credentials_handler.run_flow(st.session_state.google_credentials_json)
 
